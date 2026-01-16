@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Workout Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <h1>Voice Workout Tracker</h1>
+        <p class="subtitle">Speak your workout. Save it instantly.</p>
+      </header>
+
+      <section class="recorder">
+        <button id="recordButton" class="record-button" aria-pressed="false">
+          <span class="record-dot"></span>
+          <span id="recordLabel">Start Recording</span>
+        </button>
+        <p id="status" class="status">Ready to listen.</p>
+        <p id="transcript" class="transcript"></p>
+      </section>
+
+      <section class="actions">
+        <button id="downloadCsv" class="secondary-button">Download CSV</button>
+      </section>
+
+      <section class="log">
+        <h2>Logs</h2>
+        <ul id="logList" class="log-list"></ul>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+
