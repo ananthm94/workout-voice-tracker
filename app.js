@@ -2,30 +2,22 @@ const recordButton = document.getElementById("recordButton");
 const recordLabel = document.getElementById("recordLabel");
 const statusText = document.getElementById("status");
 const transcriptEl = document.getElementById("transcript");
+const recorderSection = document.querySelector(".recorder");
 const logList = document.getElementById("logList");
 const downloadCsv = document.getElementById("downloadCsv");
 const analyzeButton = document.getElementById("analyzeButton");
 const openSettings = document.getElementById("openSettings");
 const closeSettings = document.getElementById("closeSettings");
 const settingsModal = document.getElementById("settingsModal");
-const saveSettings = document.getElementById("saveSettings");
-const geminiKeyInput = document.getElementById("geminiKey");
-
-const GEMINI_KEY = "geminiApiKey";
 let isRecording = false;
 let recognition = null;
 let pendingTranscript = "";
 let latestTranscript = "";
+let transcriptBuffer = "";
 let currentLogs = [];
 
 const setStatus = (message) => {
   statusText.textContent = message;
-};
-
-const loadGeminiKey = () => localStorage.getItem(GEMINI_KEY) || "";
-
-const saveGeminiKey = (key) => {
-  localStorage.setItem(GEMINI_KEY, key || "");
 };
 
 const getSupabaseClient = () => window.supabaseClient.getClient();
@@ -33,6 +25,9 @@ const getSupabaseClient = () => window.supabaseClient.getClient();
 const setRecordingState = (recording) => {
   isRecording = recording;
   recordButton.classList.toggle("is-recording", recording);
+  if (recorderSection) {
+    recorderSection.classList.toggle("listening", recording);
+  }
   recordButton.setAttribute("aria-pressed", String(recording));
   recordLabel.textContent = recording ? "Stop Recording" : "Start Recording";
   setStatus(recording ? "Listening... speak your workout." : "Ready to listen.");
@@ -40,9 +35,8 @@ const setRecordingState = (recording) => {
 
 const updateActionState = () => {
   const hasTranscript = Boolean(latestTranscript.trim());
-  const apiKey = loadGeminiKey();
   const supabaseClient = getSupabaseClient();
-  analyzeButton.disabled = !hasTranscript || !apiKey || !supabaseClient;
+  analyzeButton.disabled = !hasTranscript || !supabaseClient;
 };
 
 const setupRecognition = () => {
@@ -56,7 +50,7 @@ const setupRecognition = () => {
   }
 
   const recognizer = new SpeechRecognition();
-  recognizer.continuous = false;
+  recognizer.continuous = true;
   recognizer.interimResults = true;
   recognizer.lang = "en-US";
 
@@ -71,8 +65,11 @@ const setupRecognition = () => {
         interim += result[0].transcript;
       }
     }
-    pendingTranscript = finalText.trim();
-    transcriptEl.textContent = interim || finalText;
+    if (finalText.trim()) {
+      transcriptBuffer = `${transcriptBuffer} ${finalText}`.trim();
+    }
+    pendingTranscript = transcriptBuffer.trim();
+    transcriptEl.textContent = interim || transcriptBuffer;
   };
 
   recognizer.onerror = (event) => {
@@ -81,11 +78,15 @@ const setupRecognition = () => {
   };
 
   recognizer.onend = () => {
+    if (isRecording) {
+      recognizer.start();
+      return;
+    }
     setRecordingState(false);
     if (pendingTranscript) {
       latestTranscript = pendingTranscript;
       transcriptEl.textContent = latestTranscript;
-    setStatus("Transcript ready. Analyze when you're ready.");
+      setStatus("Transcript ready. Analyze when you're ready.");
     }
     pendingTranscript = "";
     updateActionState();
@@ -102,12 +103,14 @@ const handleToggle = () => {
   if (!recognition) return;
 
   if (isRecording) {
+    isRecording = false;
     recognition.stop();
     return;
   }
 
   pendingTranscript = "";
   latestTranscript = "";
+  transcriptBuffer = "";
   transcriptEl.textContent = "";
   setRecordingState(true);
   recognition.start();
@@ -243,47 +246,28 @@ const parseJsonFromText = (text) => {
 };
 
 const analyzeWithGemini = async (text) => {
-  const apiKey = loadGeminiKey();
-  if (!apiKey) throw new Error("Missing Gemini API key.");
-
-  const systemPrompt =
-    'You are a fitness data extractor. Extract the following JSON from the user\'s natural language workout log: { "muscles": ["list", "of", "muscles"], "exertion_score": 1-10, "cardio_detected": boolean, "summary": "short summary" }. Return ONLY raw JSON.';
-
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: systemPrompt },
-              { text: `Workout log: "${text}"` },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-        },
-      }),
-    }
-  );
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(err || "Gemini request failed.");
+    let message = "Gemini request failed.";
+    try {
+      const errJson = await response.json();
+      message = errJson.error || message;
+    } catch (error) {
+      const errText = await response.text();
+      if (errText) message = errText;
+    }
+    throw new Error(message);
   }
 
   const json = await response.json();
-  const content =
-    json.candidates?.[0]?.content?.parts?.map((part) => part.text).join("") ||
-    "";
-  return parseJsonFromText(content);
+  return json;
 };
 
 const saveWorkout = async (rawText, analysis) => {
@@ -317,7 +301,7 @@ const handleAnalyze = async () => {
     await fetchLogs();
   } catch (error) {
     console.error(error);
-    setStatus("Failed to analyze or save. Check your settings.");
+    setStatus(error.message || "Failed to analyze or save.");
   } finally {
     updateActionState();
   }
@@ -367,16 +351,7 @@ const closeModal = () => {
   settingsModal.setAttribute("aria-hidden", "true");
 };
 
-const populateSettings = () => {
-  geminiKeyInput.value = loadGeminiKey();
-};
-
-const handleSaveSettings = () => {
-  saveGeminiKey(geminiKeyInput.value.trim());
-  closeModal();
-  fetchLogs();
-  updateActionState();
-};
+const populateSettings = () => {};
 
 recordButton.addEventListener("click", handleToggle);
 downloadCsv.addEventListener("click", exportCsv);
@@ -386,7 +361,6 @@ openSettings.addEventListener("click", () => {
   openModal();
 });
 closeSettings.addEventListener("click", closeModal);
-saveSettings.addEventListener("click", handleSaveSettings);
 settingsModal.addEventListener("click", (event) => {
   if (event.target === settingsModal) closeModal();
 });

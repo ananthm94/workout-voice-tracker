@@ -97,6 +97,21 @@ body {
   box-shadow: 0 0 12px rgba(255, 75, 75, 0.6);
 }
 
+.recorder.listening .record-dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.recorder.listening .status::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #ff4b4b;
+  animation: blink 1s ease-in-out infinite;
+}
+
 .status {
   color: var(--muted);
   font-size: 14px;
@@ -288,6 +303,12 @@ body {
   gap: 12px;
 }
 
+.modal-text {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -334,6 +355,31 @@ body {
   .record-button {
     font-size: 16px;
     padding: 14px 18px;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(255, 75, 75, 0.4);
+  }
+  50% {
+    transform: scale(1.25);
+    box-shadow: 0 0 16px rgba(255, 75, 75, 0.9);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(255, 75, 75, 0.4);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
