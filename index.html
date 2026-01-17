@@ -34,6 +34,22 @@
             ></textarea>
           </div>
 
+          <div class="intensity-container">
+            <label class="intensity-label">Intensity Level</label>
+            <div class="intensity-selector" id="intensitySelector">
+              <button class="intensity-btn" data-value="1">1</button>
+              <button class="intensity-btn" data-value="2">2</button>
+              <button class="intensity-btn selected" data-value="3">3</button>
+              <button class="intensity-btn" data-value="4">4</button>
+              <button class="intensity-btn" data-value="5">5</button>
+            </div>
+            <div class="intensity-labels">
+              <span>Light</span>
+              <span>Moderate</span>
+              <span>Intense</span>
+            </div>
+          </div>
+
           <button id="saveLogBtn" class="primary-btn">SAVE LOG</button>
         </div>
       </section>
@@ -56,29 +72,29 @@
                   <!-- Neck -->
                   <rect x="90" y="55" width="20" height="15" class="body-part" id="neck-front"/>
                   <!-- Shoulders -->
-                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-left-front"/>
-                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-right-front"/>
+                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" data-muscle="shoulders" id="shoulders-left-front"/>
+                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" data-muscle="shoulders" id="shoulders-right-front"/>
                   <!-- Chest -->
-                  <path d="M60 90 Q100 85 140 90 L140 130 Q100 140 60 130 Z" class="body-part muscle-part" id="chest"/>
+                  <path d="M60 90 Q100 85 140 90 L140 130 Q100 140 60 130 Z" class="body-part muscle-part" data-muscle="chest" id="chest"/>
                   <!-- Core/Abs -->
-                  <rect x="70" y="130" width="60" height="60" rx="8" class="body-part muscle-part" id="core"/>
-                  <!-- Upper Arms -->
-                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="arms-left-upper"/>
-                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="arms-right-upper"/>
+                  <rect x="70" y="130" width="60" height="60" rx="8" class="body-part muscle-part" data-muscle="core" id="core"/>
+                  <!-- Upper Arms (Biceps) -->
+                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" data-muscle="biceps" id="biceps-left"/>
+                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" data-muscle="biceps" id="biceps-right"/>
                   <!-- Forearms -->
-                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="arms-left-lower"/>
-                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="arms-right-lower"/>
+                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" data-muscle="forearms" id="forearms-left-front"/>
+                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" data-muscle="forearms" id="forearms-right-front"/>
                   <!-- Hands -->
                   <ellipse cx="41" cy="200" rx="10" ry="14" class="body-part" id="hand-left"/>
                   <ellipse cx="159" cy="200" rx="10" ry="14" class="body-part" id="hand-right"/>
                   <!-- Hips -->
                   <path d="M65 190 Q100 185 135 190 L130 210 Q100 220 70 210 Z" class="body-part" id="hips-front"/>
                   <!-- Upper Legs/Quads -->
-                  <rect x="65" y="210" width="28" height="80" rx="12" class="body-part muscle-part" id="legs-left-upper"/>
-                  <rect x="107" y="210" width="28" height="80" rx="12" class="body-part muscle-part" id="legs-right-upper"/>
+                  <rect x="65" y="210" width="28" height="80" rx="12" class="body-part muscle-part" data-muscle="quads" id="quads-left"/>
+                  <rect x="107" y="210" width="28" height="80" rx="12" class="body-part muscle-part" data-muscle="quads" id="quads-right"/>
                   <!-- Lower Legs/Calves -->
-                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="legs-left-lower"/>
-                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="legs-right-lower"/>
+                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" data-muscle="calves" id="calves-left-front"/>
+                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" data-muscle="calves" id="calves-right-front"/>
                   <!-- Feet -->
                   <ellipse cx="79" cy="375" rx="16" ry="8" class="body-part" id="foot-left"/>
                   <ellipse cx="121" cy="375" rx="16" ry="8" class="body-part" id="foot-right"/>
@@ -92,30 +108,30 @@
                   <!-- Neck -->
                   <rect x="90" y="55" width="20" height="15" class="body-part" id="neck-back"/>
                   <!-- Shoulders -->
-                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-left-back"/>
-                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-right-back"/>
+                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" data-muscle="shoulders" id="shoulders-left-back"/>
+                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" data-muscle="shoulders" id="shoulders-right-back"/>
                   <!-- Upper Back -->
-                  <path d="M60 90 Q100 85 140 90 L138 125 Q100 130 62 125 Z" class="body-part muscle-part" id="back-upper"/>
+                  <path d="M60 90 Q100 85 140 90 L138 125 Q100 130 62 125 Z" class="body-part muscle-part" data-muscle="back" id="back-upper"/>
                   <!-- Lower Back -->
-                  <rect x="68" y="125" width="64" height="45" rx="6" class="body-part muscle-part" id="back-lower"/>
+                  <rect x="68" y="125" width="64" height="45" rx="6" class="body-part muscle-part" data-muscle="back" id="back-lower"/>
                   <!-- Upper Arms (Triceps) -->
-                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="triceps-left"/>
-                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="triceps-right"/>
+                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" data-muscle="triceps" id="triceps-left"/>
+                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" data-muscle="triceps" id="triceps-right"/>
                   <!-- Forearms -->
-                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="forearms-left"/>
-                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="forearms-right"/>
+                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" data-muscle="forearms" id="forearms-left-back"/>
+                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" data-muscle="forearms" id="forearms-right-back"/>
                   <!-- Hands -->
                   <ellipse cx="41" cy="200" rx="10" ry="14" class="body-part" id="hand-left-back"/>
                   <ellipse cx="159" cy="200" rx="10" ry="14" class="body-part" id="hand-right-back"/>
                   <!-- Glutes -->
-                  <ellipse cx="79" cy="200" rx="18" ry="16" class="body-part muscle-part" id="glutes-left"/>
-                  <ellipse cx="121" cy="200" rx="18" ry="16" class="body-part muscle-part" id="glutes-right"/>
+                  <ellipse cx="79" cy="200" rx="18" ry="16" class="body-part muscle-part" data-muscle="glutes" id="glutes-left"/>
+                  <ellipse cx="121" cy="200" rx="18" ry="16" class="body-part muscle-part" data-muscle="glutes" id="glutes-right"/>
                   <!-- Hamstrings -->
-                  <rect x="65" y="218" width="28" height="72" rx="12" class="body-part muscle-part" id="hamstrings-left"/>
-                  <rect x="107" y="218" width="28" height="72" rx="12" class="body-part muscle-part" id="hamstrings-right"/>
+                  <rect x="65" y="218" width="28" height="72" rx="12" class="body-part muscle-part" data-muscle="hamstrings" id="hamstrings-left"/>
+                  <rect x="107" y="218" width="28" height="72" rx="12" class="body-part muscle-part" data-muscle="hamstrings" id="hamstrings-right"/>
                   <!-- Calves -->
-                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="calves-left"/>
-                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="calves-right"/>
+                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" data-muscle="calves" id="calves-left-back"/>
+                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" data-muscle="calves" id="calves-right-back"/>
                   <!-- Feet -->
                   <ellipse cx="79" cy="375" rx="16" ry="8" class="body-part" id="foot-left-back"/>
                   <ellipse cx="121" cy="375" rx="16" ry="8" class="body-part" id="foot-right-back"/>
@@ -127,6 +143,17 @@
 
           <div id="insightBox" class="insight-box">
             <p id="insightText">Analyzing your workout patterns...</p>
+            <div id="weeklySummary" class="weekly-summary">
+              <div class="weekly-summary-item">
+                <span class="count" id="strengthCount">0</span>x 🏋️
+              </div>
+              <div class="weekly-summary-item">
+                <span class="count" id="cardioCount">0</span>x ❤️
+              </div>
+              <div class="weekly-summary-item">
+                <span class="count" id="flexibilityCount">0</span>x 🧘
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -138,6 +165,32 @@
         </header>
 
         <div class="recommendations-content">
+          <!-- User State Sliders -->
+          <div class="state-sliders">
+            <div class="slider-group">
+              <div class="slider-header">
+                <label>Energy Level</label>
+                <span class="slider-value" id="energyValue">50</span>
+              </div>
+              <input type="range" id="energySlider" class="state-slider" min="0" max="100" value="50" />
+              <div class="slider-labels">
+                <span>Exhausted</span>
+                <span>Energized</span>
+              </div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-header">
+                <label>Rest Level</label>
+                <span class="slider-value" id="restValue">50</span>
+              </div>
+              <input type="range" id="restSlider" class="state-slider" min="0" max="100" value="50" />
+              <div class="slider-labels">
+                <span>Need Rest</span>
+                <span>Well Rested</span>
+              </div>
+            </div>
+          </div>
+
           <div class="recommendation-card">
             <p class="recommendation-label">Recommended:</p>
             <h2 id="recommendationTitle">Full Body Strength</h2>
@@ -152,6 +205,28 @@
             <h3>Why This Workout?</h3>
             <p id="explanationText">Based on your last few days of cardio and historical data, this workout is suggested for balanced strength.</p>
           </div>
+
+          <!-- Tell Me More Component -->
+          <div id="workoutDetailView" class="workout-detail-view">
+            <button id="tellMeMoreBtn" class="detail-toggle-btn">
+              <span>Tell Me More</span>
+              <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <div id="detailContent" class="detail-content hidden">
+              <div class="advice-box">
+                <h4>💡 Training Advice</h4>
+                <p id="adviceText">Loading advice based on your history...</p>
+              </div>
+              <div class="exercises-box">
+                <h4>Example Exercises</h4>
+                <ul id="exerciseList" class="exercise-list">
+                  <li>Loading...</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -164,7 +239,7 @@
         <div class="profile-content">
           <div class="input-group">
             <label for="weightInput">Weight (kg)</label>
-            <input type="number" id="weightInput" class="form-input" placeholder="70" min="20" max="300" />
+            <input type="number" id="weightInput" class="form-input" placeholder="70" min="20" max="300" step="0.1" />
           </div>
 
           <div class="input-group">
@@ -180,7 +255,13 @@
           </div>
 
           <div class="chart-section">
-            <h3>Weekly History</h3>
+            <div class="chart-section-header">
+              <h3>Weekly History</h3>
+              <div class="chart-toggle">
+                <button class="chart-toggle-btn active" data-chart="weight">Weight</button>
+                <button class="chart-toggle-btn" data-chart="sessions">Sessions</button>
+              </div>
+            </div>
             <div class="chart-container">
               <canvas id="weeklyChart"></canvas>
             </div>

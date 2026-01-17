@@ -11,6 +11,10 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname)));
 
+// In-memory cache (in production, use Redis or database)
+let muscleHeatmapCache = {};
+let lastCacheUpdate = null;
+
 const parseJsonFromText = (text) => {
   try {
     return JSON.parse(text);
@@ -21,6 +25,9 @@ const parseJsonFromText = (text) => {
   }
 };
 
+// ============================================
+// Analyze Workout (Extract Tags)
+// ============================================
 app.post("/api/analyze", async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
@@ -31,8 +38,18 @@ app.post("/api/analyze", async (req, res) => {
       return res.status(400).json({ error: "Missing text." });
     }
 
-    const systemPrompt =
-      'You are a fitness data extractor. Extract the following JSON from the user\'s natural language workout log: { "muscles": ["list", "of", "muscles"], "exertion_score": 1-10, "cardio_detected": boolean, "summary": "short summary" }. Return ONLY raw JSON.';
+    const systemPrompt = `You are a fitness data extractor. Analyze the user's workout notes and extract structured data.
+
+Extract the following JSON:
+{
+  "muscles": ["list of specific muscle groups worked, e.g., chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core"],
+  "exertion_score": 1-10 (intensity level),
+  "cardio_detected": boolean (true if cardio/running/cycling/HIIT mentioned),
+  "flexibility_detected": boolean (true if stretching/yoga/mobility mentioned),
+  "summary": "brief 1-sentence summary"
+}
+
+Return ONLY raw JSON, no markdown.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
@@ -48,7 +65,7 @@ app.post("/api/analyze", async (req, res) => {
               role: "user",
               parts: [
                 { text: systemPrompt },
-                { text: `Workout log: "${text}"` },
+                { text: `Workout notes: "${text}"` },
               ],
             },
           ],
@@ -62,9 +79,7 @@ app.post("/api/analyze", async (req, res) => {
     if (!response.ok) {
       const err = await response.text();
       return res.status(500).json({
-        error:
-          err ||
-          "Gemini request failed. Set GEMINI_MODEL or call /api/models.",
+        error: err || "Gemini request failed.",
       });
     }
 
@@ -80,11 +95,9 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
-
-// AI-powered workout recommendation
+// ============================================
+// AI Workout Recommendation
+// ============================================
 app.post("/api/recommend", async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
@@ -92,23 +105,28 @@ app.post("/api/recommend", async (req, res) => {
     }
 
     const { logs } = req.body || {};
-    const recentWorkouts = (logs || [])
-      .slice(0, 5)
-      .map((log) => ({
-        muscles: log.muscles_hit || [],
-        cardio: log.cardio_detected || false,
-        date: log.created_at,
-      }));
+    const recentWorkouts = (logs || []).slice(0, 7).map((log) => ({
+      muscles: log.muscles_hit || [],
+      cardio: log.cardio_detected || false,
+      flexibility: log.flexibility_detected || false,
+      date: log.created_at,
+    }));
 
-    const systemPrompt = `You are a fitness coach AI. Based on the user's recent workout history, suggest the best workout for today. Consider muscle recovery (don't work the same muscles 2 days in a row), balance (alternate between push/pull/legs), and variety.
+    const systemPrompt = `You are a fitness coach AI. Based on the user's recent workout history (last 7 days), suggest the best workout for today.
+
+Consider:
+1. Muscle recovery - don't work the same muscles 2 days in a row
+2. Balance - alternate between push/pull/legs
+3. Variety - include cardio if missing, flexibility if neglected
+4. Progressive overload - suggest intensity adjustments
 
 Recent workouts (most recent first):
 ${JSON.stringify(recentWorkouts, null, 2)}
 
-Return ONLY a JSON object with:
+Return ONLY a JSON object:
 {
-  "workout": "Name of suggested workout (e.g., 'Upper Body Push', 'Leg Day', 'Full Body Strength', 'Active Recovery', 'Core & Cardio')",
-  "reason": "1-2 sentence explanation of why this workout is recommended based on their history"
+  "workout": "Name of suggested workout (e.g., 'Upper Body Push', 'Leg Day', 'Full Body Strength', 'Active Recovery & Stretch', 'Core & Cardio', 'HIIT Session')",
+  "reason": "1-2 sentence explanation based on their history"
 }`;
 
     const response = await fetch(
@@ -143,6 +161,40 @@ Return ONLY a JSON object with:
   }
 });
 
+// ============================================
+// Heatmap Cache
+// ============================================
+app.get("/api/heatmap-cache", (req, res) => {
+  res.json(muscleHeatmapCache);
+});
+
+app.post("/api/update-cache", (req, res) => {
+  try {
+    const { session } = req.body || {};
+    if (!session) {
+      return res.status(400).json({ error: "Missing session data." });
+    }
+
+    // Update muscle heatmap cache
+    const muscles = session.muscles_hit || [];
+    muscles.forEach((muscle) => {
+      const key = muscle.toLowerCase().trim();
+      // Add 0.3 for each new workout, decay will happen on read
+      muscleHeatmapCache[key] = Math.min(1, (muscleHeatmapCache[key] || 0) + 0.3);
+    });
+
+    lastCacheUpdate = new Date().toISOString();
+
+    return res.json({ success: true, cache: muscleHeatmapCache });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Cache update failed." });
+  }
+});
+
+// ============================================
+// List Available Models
+// ============================================
 app.get("/api/models", async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
@@ -169,3 +221,22 @@ app.get("/api/models", async (req, res) => {
   }
 });
 
+// ============================================
+// Health Check
+// ============================================
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    model: GEMINI_MODEL,
+    hasApiKey: !!GEMINI_API_KEY,
+    lastCacheUpdate,
+  });
+});
+
+// ============================================
+// Start Server
+// ============================================
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Using Gemini model: ${GEMINI_MODEL}`);
+});
