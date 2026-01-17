@@ -9,8 +9,13 @@
   <body>
     <main class="app">
       <header class="header">
-        <h1>Voice Workout Tracker</h1>
-        <p class="subtitle">Speak your workout. Save it instantly.</p>
+        <div>
+          <h1>Voice Workout Tracker</h1>
+          <p class="subtitle">Speak your workout. Analyze it with Gemini.</p>
+        </div>
+        <button id="openSettings" class="icon-button" aria-label="Settings">
+          ⚙️
+        </button>
       </header>
 
       <section class="recorder">
@@ -23,7 +28,41 @@
       </section>
 
       <section class="actions">
+        <button id="analyzeButton" class="primary-button" disabled>
+          Analyze
+        </button>
         <button id="downloadCsv" class="secondary-button">Download CSV</button>
+      </section>
+
+      <section class="heatmap">
+        <div class="heatmap-header">
+          <h2>Muscle Heatmap</h2>
+          <p class="subtitle">Highlights muscles from recent sessions.</p>
+        </div>
+        <div class="heatmap-card">
+          <svg
+            id="bodyMap"
+            viewBox="0 0 200 360"
+            role="img"
+            aria-label="Muscle heatmap"
+          >
+            <rect x="92" y="12" width="16" height="22" rx="6" fill="#202530" />
+            <rect id="shoulders" x="50" y="38" width="100" height="28" rx="14" />
+            <rect id="chest" x="65" y="70" width="70" height="40" rx="12" />
+            <g id="arms">
+              <rect x="20" y="70" width="30" height="120" rx="14" />
+              <rect x="150" y="70" width="30" height="120" rx="14" />
+            </g>
+            <rect id="core" x="78" y="112" width="44" height="70" rx="10" />
+            <rect id="back" x="65" y="190" width="70" height="40" rx="12" />
+            <rect id="legs" x="70" y="236" width="60" height="96" rx="18" />
+          </svg>
+          <div class="legend">
+            <span class="legend-item">
+              <span class="legend-swatch high"></span> Active muscle
+            </span>
+          </div>
+        </div>
       </section>
 
       <section class="log">
@@ -32,6 +71,28 @@
       </section>
     </main>
 
+    <div id="settingsModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button id="closeSettings" class="icon-button" aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <label class="field">
+            <span>Enter Gemini API Key</span>
+            <input id="geminiKey" type="password" placeholder="AIza..." />
+          </label>
+          <button id="saveSettings" class="primary-button">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
