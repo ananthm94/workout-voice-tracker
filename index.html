@@ -2,95 +2,231 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Voice Workout Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Workout Tracker</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   </head>
   <body>
-    <main class="app">
-      <header class="header">
-        <div>
-          <h1>Voice Workout Tracker</h1>
-          <p class="subtitle">Speak your workout. Analyze it with Gemini.</p>
-        </div>
-        <button id="openSettings" class="icon-button" aria-label="Settings">
-          ⚙️
-        </button>
-      </header>
+    <div class="app">
+      <!-- Screen 1: Home -->
+      <section id="screen-home" class="screen active">
+        <header class="screen-header">
+          <h1>Workout Tracker</h1>
+        </header>
 
-      <section class="recorder">
-        <button id="recordButton" class="record-button" aria-pressed="false">
-          <span class="record-dot"></span>
-          <span id="recordLabel">Start Recording</span>
-        </button>
-        <p id="status" class="status">Ready to listen.</p>
-        <p id="transcript" class="transcript"></p>
+        <div class="home-content">
+          <div class="record-container">
+            <button id="recordButton" class="record-btn">
+              <span class="record-btn-inner">
+                <span id="recordLabel">START<br>RECORDING</span>
+              </span>
+            </button>
+            <p id="timer" class="timer">00:00</p>
+          </div>
+
+          <div class="notes-container">
+            <textarea
+              id="workoutNotes"
+              class="notes-input"
+              placeholder="Enter workout notes (e.g., chest day, focused on form)..."
+              rows="3"
+            ></textarea>
+          </div>
+
+          <button id="saveLogBtn" class="primary-btn">SAVE LOG</button>
+        </div>
       </section>
 
-      <section class="actions">
-        <button id="analyzeButton" class="primary-button" disabled>
-          Analyze
-        </button>
-        <button id="downloadCsv" class="secondary-button">Download CSV</button>
-      </section>
+      <!-- Screen 2: Logs -->
+      <section id="screen-logs" class="screen">
+        <header class="screen-header">
+          <h1>Workout Logs</h1>
+        </header>
 
-      <section class="heatmap">
-        <div class="heatmap-header">
-          <h2>Muscle Heatmap</h2>
-          <p class="subtitle">Highlights muscles from recent sessions.</p>
-        </div>
-        <div class="heatmap-card">
-          <svg
-            id="bodyMap"
-            viewBox="0 0 200 360"
-            role="img"
-            aria-label="Muscle heatmap"
-          >
-            <rect x="92" y="12" width="16" height="22" rx="6" fill="#202530" />
-            <rect id="shoulders" x="50" y="38" width="100" height="28" rx="14" />
-            <rect id="chest" x="65" y="70" width="70" height="40" rx="12" />
-            <g id="arms">
-              <rect x="20" y="70" width="30" height="120" rx="14" />
-              <rect x="150" y="70" width="30" height="120" rx="14" />
-            </g>
-            <rect id="core" x="78" y="112" width="44" height="70" rx="10" />
-            <rect id="back" x="65" y="190" width="70" height="40" rx="12" />
-            <rect id="legs" x="70" y="236" width="60" height="96" rx="18" />
-          </svg>
-          <div class="legend">
-            <span class="legend-item">
-              <span class="legend-swatch high"></span> Active muscle
-            </span>
+        <div class="logs-content">
+          <ul id="logList" class="log-list"></ul>
+
+          <div class="heatmap-section">
+            <div class="heatmap-container">
+              <div class="heatmap-view">
+                <svg id="bodyFront" viewBox="0 0 200 400" class="body-svg">
+                  <!-- Head -->
+                  <ellipse cx="100" cy="30" rx="25" ry="28" class="body-part" id="head-front"/>
+                  <!-- Neck -->
+                  <rect x="90" y="55" width="20" height="15" class="body-part" id="neck-front"/>
+                  <!-- Shoulders -->
+                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-left-front"/>
+                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-right-front"/>
+                  <!-- Chest -->
+                  <path d="M60 90 Q100 85 140 90 L140 130 Q100 140 60 130 Z" class="body-part muscle-part" id="chest"/>
+                  <!-- Core/Abs -->
+                  <rect x="70" y="130" width="60" height="60" rx="8" class="body-part muscle-part" id="core"/>
+                  <!-- Upper Arms -->
+                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="arms-left-upper"/>
+                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="arms-right-upper"/>
+                  <!-- Forearms -->
+                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="arms-left-lower"/>
+                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="arms-right-lower"/>
+                  <!-- Hands -->
+                  <ellipse cx="41" cy="200" rx="10" ry="14" class="body-part" id="hand-left"/>
+                  <ellipse cx="159" cy="200" rx="10" ry="14" class="body-part" id="hand-right"/>
+                  <!-- Hips -->
+                  <path d="M65 190 Q100 185 135 190 L130 210 Q100 220 70 210 Z" class="body-part" id="hips-front"/>
+                  <!-- Upper Legs/Quads -->
+                  <rect x="65" y="210" width="28" height="80" rx="12" class="body-part muscle-part" id="legs-left-upper"/>
+                  <rect x="107" y="210" width="28" height="80" rx="12" class="body-part muscle-part" id="legs-right-upper"/>
+                  <!-- Lower Legs/Calves -->
+                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="legs-left-lower"/>
+                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="legs-right-lower"/>
+                  <!-- Feet -->
+                  <ellipse cx="79" cy="375" rx="16" ry="8" class="body-part" id="foot-left"/>
+                  <ellipse cx="121" cy="375" rx="16" ry="8" class="body-part" id="foot-right"/>
+                </svg>
+                <span class="heatmap-label">Front view</span>
+              </div>
+              <div class="heatmap-view">
+                <svg id="bodyBack" viewBox="0 0 200 400" class="body-svg">
+                  <!-- Head -->
+                  <ellipse cx="100" cy="30" rx="25" ry="28" class="body-part" id="head-back"/>
+                  <!-- Neck -->
+                  <rect x="90" y="55" width="20" height="15" class="body-part" id="neck-back"/>
+                  <!-- Shoulders -->
+                  <ellipse cx="55" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-left-back"/>
+                  <ellipse cx="145" cy="85" rx="18" ry="12" class="body-part muscle-part" id="shoulders-right-back"/>
+                  <!-- Upper Back -->
+                  <path d="M60 90 Q100 85 140 90 L138 125 Q100 130 62 125 Z" class="body-part muscle-part" id="back-upper"/>
+                  <!-- Lower Back -->
+                  <rect x="68" y="125" width="64" height="45" rx="6" class="body-part muscle-part" id="back-lower"/>
+                  <!-- Upper Arms (Triceps) -->
+                  <rect x="35" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="triceps-left"/>
+                  <rect x="143" y="90" width="22" height="50" rx="10" class="body-part muscle-part" id="triceps-right"/>
+                  <!-- Forearms -->
+                  <rect x="32" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="forearms-left"/>
+                  <rect x="150" y="140" width="18" height="50" rx="8" class="body-part muscle-part" id="forearms-right"/>
+                  <!-- Hands -->
+                  <ellipse cx="41" cy="200" rx="10" ry="14" class="body-part" id="hand-left-back"/>
+                  <ellipse cx="159" cy="200" rx="10" ry="14" class="body-part" id="hand-right-back"/>
+                  <!-- Glutes -->
+                  <ellipse cx="79" cy="200" rx="18" ry="16" class="body-part muscle-part" id="glutes-left"/>
+                  <ellipse cx="121" cy="200" rx="18" ry="16" class="body-part muscle-part" id="glutes-right"/>
+                  <!-- Hamstrings -->
+                  <rect x="65" y="218" width="28" height="72" rx="12" class="body-part muscle-part" id="hamstrings-left"/>
+                  <rect x="107" y="218" width="28" height="72" rx="12" class="body-part muscle-part" id="hamstrings-right"/>
+                  <!-- Calves -->
+                  <rect x="68" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="calves-left"/>
+                  <rect x="110" y="295" width="22" height="70" rx="10" class="body-part muscle-part" id="calves-right"/>
+                  <!-- Feet -->
+                  <ellipse cx="79" cy="375" rx="16" ry="8" class="body-part" id="foot-left-back"/>
+                  <ellipse cx="121" cy="375" rx="16" ry="8" class="body-part" id="foot-right-back"/>
+                </svg>
+                <span class="heatmap-label">Back view</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="insightBox" class="insight-box">
+            <p id="insightText">Analyzing your workout patterns...</p>
           </div>
         </div>
       </section>
 
-      <section class="log">
-        <h2>Logs</h2>
-        <ul id="logList" class="log-list"></ul>
-      </section>
-    </main>
+      <!-- Screen 3: Recommendations -->
+      <section id="screen-recommendations" class="screen">
+        <header class="screen-header">
+          <h1>Today's Workout</h1>
+        </header>
 
-    <div id="settingsModal" class="modal hidden" aria-hidden="true">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Settings</h2>
-          <button id="closeSettings" class="icon-button" aria-label="Close">
-            ✕
-          </button>
+        <div class="recommendations-content">
+          <div class="recommendation-card">
+            <p class="recommendation-label">Recommended:</p>
+            <h2 id="recommendationTitle">Full Body Strength</h2>
+          </div>
+
+          <div class="recommendation-actions">
+            <button id="changeWorkoutBtn" class="secondary-btn">Change Workout</button>
+            <button id="whyBtn" class="primary-btn">Why?</button>
+          </div>
+
+          <div id="explanationBox" class="explanation-box hidden">
+            <h3>Why This Workout?</h3>
+            <p id="explanationText">Based on your last few days of cardio and historical data, this workout is suggested for balanced strength.</p>
+          </div>
         </div>
-        <div class="modal-body">
-          <p class="modal-text">
-            Gemini API key is stored on the server proxy. Update it in the
-            server environment.
-          </p>
+      </section>
+
+      <!-- Screen 4: Profile -->
+      <section id="screen-profile" class="screen">
+        <header class="screen-header">
+          <h1>My Profile</h1>
+        </header>
+
+        <div class="profile-content">
+          <div class="input-group">
+            <label for="weightInput">Weight (kg)</label>
+            <input type="number" id="weightInput" class="form-input" placeholder="70" min="20" max="300" />
+          </div>
+
+          <div class="input-group">
+            <label for="heightInput">Height (cm)</label>
+            <input type="number" id="heightInput" class="form-input" placeholder="170" min="100" max="250" />
+          </div>
+
+          <button id="calculateBmiBtn" class="primary-btn">Calculate BMI</button>
+
+          <div id="bmiResult" class="bmi-result hidden">
+            <h3>Your BMI</h3>
+            <p id="bmiValue">22.5 (Normal Weight)</p>
+          </div>
+
+          <div class="chart-section">
+            <h3>Weekly History</h3>
+            <div class="chart-container">
+              <canvas id="weeklyChart"></canvas>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <!-- Bottom Navigation -->
+      <nav class="bottom-nav">
+        <button class="nav-item active" data-screen="home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span class="nav-label">Home</span>
+        </button>
+        <button class="nav-item" data-screen="logs">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+          <span class="nav-label">Logs</span>
+        </button>
+        <button class="nav-item" data-screen="recommendations">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18h6"/>
+            <path d="M10 22h4"/>
+            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+          </svg>
+          <span class="nav-label">Tips</span>
+        </button>
+        <button class="nav-item" data-screen="profile">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span class="nav-label">Profile</span>
+        </button>
+      </nav>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabaseClient.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
-
