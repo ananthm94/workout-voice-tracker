@@ -9,8 +9,50 @@
   </head>
   <body>
     <div class="app">
+      <!-- Auth Screen -->
+      <section id="screen-auth" class="screen auth-screen active">
+        <div class="auth-container">
+          <div class="auth-header">
+            <div class="auth-logo">🏋️</div>
+            <h1>Workout Tracker</h1>
+            <p>Track your fitness journey</p>
+          </div>
+
+          <div class="auth-form">
+            <div class="auth-tabs">
+              <button class="auth-tab active" data-tab="login">Sign In</button>
+              <button class="auth-tab" data-tab="signup">Sign Up</button>
+            </div>
+
+            <form id="authForm">
+              <div class="input-group">
+                <label for="authEmail">Email</label>
+                <input type="email" id="authEmail" class="form-input" placeholder="your@email.com" required />
+              </div>
+
+              <div class="input-group">
+                <label for="authPassword">Password</label>
+                <input type="password" id="authPassword" class="form-input" placeholder="••••••••" required minlength="6" />
+              </div>
+
+              <p id="authError" class="auth-error hidden"></p>
+              <p id="authSuccess" class="auth-success hidden"></p>
+
+              <button type="submit" id="authSubmitBtn" class="primary-btn">
+                <span id="authSubmitText">Sign In</span>
+              </button>
+            </form>
+
+            <p class="auth-footer">
+              <span id="authToggleText">Don't have an account?</span>
+              <button type="button" id="authToggleBtn" class="auth-link">Sign up</button>
+            </p>
+          </div>
+        </div>
+      </section>
+
       <!-- Screen 1: Home -->
-      <section id="screen-home" class="screen active">
+      <section id="screen-home" class="screen">
         <header class="screen-header">
           <h1>Workout Tracker</h1>
         </header>
@@ -48,6 +90,12 @@
               <span>Moderate</span>
               <span>Intense</span>
             </div>
+          </div>
+
+          <div class="date-container">
+            <label class="date-label">Workout Date</label>
+            <input type="date" id="workoutDate" class="form-input date-input" />
+            <p class="date-hint">Leave as today or pick a past date to backfill</p>
           </div>
 
           <button id="saveLogBtn" class="primary-btn">SAVE LOG</button>
@@ -201,6 +249,15 @@
             <button id="whyBtn" class="primary-btn">Why?</button>
           </div>
 
+          <button id="howAmIDoingBtn" class="feedback-btn">
+            <span>🤔 How am I doing?</span>
+          </button>
+
+          <div id="feedbackBox" class="feedback-box hidden">
+            <h3>📊 Your Progress Report</h3>
+            <p id="feedbackText">Analyzing your workout history...</p>
+          </div>
+
           <div id="explanationBox" class="explanation-box hidden">
             <h3>Why This Workout?</h3>
             <p id="explanationText">Based on your last few days of cardio and historical data, this workout is suggested for balanced strength.</p>
@@ -237,6 +294,20 @@
         </header>
 
         <div class="profile-content">
+          <!-- User Info Card -->
+          <div class="user-info-card">
+            <div class="user-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="user-details">
+              <p id="userEmail" class="user-email">Loading...</p>
+              <button id="signOutBtn" class="sign-out-btn">Sign Out</button>
+            </div>
+          </div>
+
           <div class="input-group">
             <label for="weightInput">Weight (kg)</label>
             <input type="number" id="weightInput" class="form-input" placeholder="70" min="20" max="300" step="0.1" />
@@ -247,7 +318,7 @@
             <input type="number" id="heightInput" class="form-input" placeholder="170" min="100" max="250" />
           </div>
 
-          <button id="calculateBmiBtn" class="primary-btn">Calculate BMI</button>
+          <button id="calculateBmiBtn" class="primary-btn">Save Profile & Calculate BMI</button>
 
           <div id="bmiResult" class="bmi-result hidden">
             <h3>Your BMI</h3>
@@ -268,6 +339,35 @@
           </div>
         </div>
       </section>
+
+      <!-- Edit Workout Modal -->
+      <div id="editModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Edit Workout</h3>
+            <button id="closeEditModal" class="modal-close">&times;</button>
+          </div>
+          <form id="editForm">
+            <input type="hidden" id="editWorkoutId" />
+            
+            <div class="input-group">
+              <label for="editDate">Workout Date</label>
+              <input type="date" id="editDate" class="form-input" required />
+            </div>
+
+            <div class="input-group">
+              <label for="editNotes">Notes</label>
+              <textarea id="editNotes" class="notes-input" rows="3"></textarea>
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" id="deleteWorkoutBtn" class="delete-btn">Delete</button>
+              <button type="submit" class="primary-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- Bottom Navigation -->
       <nav class="bottom-nav">

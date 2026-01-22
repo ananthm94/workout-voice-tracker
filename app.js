@@ -11,6 +11,7 @@ let startTime = null;
 let timerInterval = null;
 let recognition = null;
 let selectedIntensity = 3;
+let currentUser = null;
 
 // User State for Recommendations
 const userState = {
@@ -19,12 +20,216 @@ const userState = {
 };
 
 // ============================================
+// Authentication
+// ============================================
+const authScreen = document.getElementById("screen-auth");
+const authForm = document.getElementById("authForm");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authError = document.getElementById("authError");
+const authSuccess = document.getElementById("authSuccess");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authSubmitText = document.getElementById("authSubmitText");
+const authTabs = document.querySelectorAll(".auth-tab");
+const authToggleBtn = document.getElementById("authToggleBtn");
+const authToggleText = document.getElementById("authToggleText");
+const bottomNav = document.querySelector(".bottom-nav");
+
+let authMode = "login"; // "login" or "signup"
+
+const showAuthError = (message) => {
+  if (authError) {
+    authError.textContent = message;
+    authError.classList.remove("hidden");
+  }
+  if (authSuccess) authSuccess.classList.add("hidden");
+};
+
+const showAuthSuccess = (message) => {
+  if (authSuccess) {
+    authSuccess.textContent = message;
+    authSuccess.classList.remove("hidden");
+  }
+  if (authError) authError.classList.add("hidden");
+};
+
+const clearAuthMessages = () => {
+  if (authError) authError.classList.add("hidden");
+  if (authSuccess) authSuccess.classList.add("hidden");
+};
+
+const setAuthMode = (mode) => {
+  authMode = mode;
+  clearAuthMessages();
+  
+  authTabs?.forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.tab === mode);
+  });
+  
+  if (authSubmitText) {
+    authSubmitText.textContent = mode === "login" ? "Sign In" : "Sign Up";
+  }
+  
+  if (authToggleText) {
+    authToggleText.textContent = mode === "login" 
+      ? "Don't have an account?" 
+      : "Already have an account?";
+  }
+  
+  if (authToggleBtn) {
+    authToggleBtn.textContent = mode === "login" ? "Sign up" : "Sign in";
+  }
+};
+
+authTabs?.forEach((tab) => {
+  tab.addEventListener("click", () => setAuthMode(tab.dataset.tab));
+});
+
+authToggleBtn?.addEventListener("click", () => {
+  setAuthMode(authMode === "login" ? "signup" : "login");
+});
+
+authForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAuthMessages();
+  
+  const email = authEmail?.value?.trim();
+  const password = authPassword?.value;
+  
+  if (!email || !password) {
+    showAuthError("Please enter email and password.");
+    return;
+  }
+  
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase) {
+    showAuthError("Supabase not configured.");
+    return;
+  }
+  
+  if (authSubmitBtn) authSubmitBtn.disabled = true;
+  if (authSubmitText) authSubmitText.textContent = "Loading...";
+  
+  try {
+    let result;
+    
+    if (authMode === "signup") {
+      result = await supabase.auth.signUp({ email, password });
+      
+      if (result.error) throw result.error;
+      
+      if (result.data?.user?.identities?.length === 0) {
+        showAuthError("An account with this email already exists.");
+      } else {
+        showAuthSuccess("Check your email to confirm your account!");
+      }
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (result.error) throw result.error;
+      
+      // Check if login was successful
+      if (result.data?.session) {
+        showAuthSuccess("Logged in! Redirecting...");
+      } else if (result.data?.user && !result.data.session) {
+        // User exists but no session - likely needs email confirmation
+        showAuthError("Please confirm your email before logging in. Check your inbox.");
+      }
+    }
+  } catch (error) {
+    console.error("Auth error:", error);
+    
+    // Provide more helpful error messages
+    let message = error.message || "Authentication failed.";
+    
+    if (message.includes("Invalid login credentials")) {
+      message = "Invalid email or password. Please try again.";
+    } else if (message.includes("Email not confirmed")) {
+      message = "Please confirm your email before logging in. Check your inbox.";
+    } else if (message.includes("User not found")) {
+      message = "No account found with this email. Try signing up.";
+    } else if (message.includes("aborted") || message.includes("network") || error.name === "AbortError") {
+      message = "Network error. Please check your internet connection and try again.";
+    } else if (message.includes("fetch")) {
+      message = "Connection failed. Please check your internet and try again.";
+    }
+    
+    showAuthError(message);
+  } finally {
+    if (authSubmitBtn) authSubmitBtn.disabled = false;
+    setAuthMode(authMode);
+  }
+});
+
+const showAuthScreen = () => {
+  screens.forEach((s) => s.classList.remove("active"));
+  if (authScreen) authScreen.classList.add("active");
+  if (bottomNav) bottomNav.style.display = "none";
+};
+
+const hideAuthScreen = () => {
+  if (authScreen) authScreen.classList.remove("active");
+  if (bottomNav) bottomNav.style.display = "flex";
+  navigateTo("home");
+};
+
+const initAuth = async () => {
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase) {
+    console.error("Supabase not configured");
+    showAuthScreen();
+    return;
+  }
+  
+  // Check for existing session
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session?.user) {
+    currentUser = session.user;
+    hideAuthScreen();
+    initApp();
+  } else {
+    showAuthScreen();
+  }
+  
+  // Listen for auth state changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session?.user) {
+      currentUser = session.user;
+      hideAuthScreen();
+      initApp();
+    } else if (event === "SIGNED_OUT") {
+      currentUser = null;
+      currentLogs = [];
+      showAuthScreen();
+    }
+  });
+};
+
+// Sign Out
+const signOutBtn = document.getElementById("signOutBtn");
+const userEmailEl = document.getElementById("userEmail");
+
+signOutBtn?.addEventListener("click", async () => {
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase) return;
+  
+  await supabase.auth.signOut();
+});
+
+// ============================================
 // Navigation
 // ============================================
 const navItems = document.querySelectorAll(".nav-item");
 const screens = document.querySelectorAll(".screen");
 
 const navigateTo = (screenId) => {
+  // Don't navigate if not logged in
+  if (!currentUser && screenId !== "auth") {
+    showAuthScreen();
+    return;
+  }
+  
   screens.forEach((s) => s.classList.remove("active"));
   navItems.forEach((n) => n.classList.remove("active"));
 
@@ -59,6 +264,17 @@ const recordLabel = document.getElementById("recordLabel");
 const timerEl = document.getElementById("timer");
 const notesInput = document.getElementById("workoutNotes");
 const saveLogBtn = document.getElementById("saveLogBtn");
+const workoutDateInput = document.getElementById("workoutDate");
+
+// Set default date to today
+const setDefaultDate = () => {
+  if (workoutDateInput) {
+    const today = new Date().toISOString().split("T")[0];
+    workoutDateInput.value = today;
+    workoutDateInput.max = today; // Can't select future dates
+  }
+};
+setDefaultDate();
 
 const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
@@ -164,9 +380,22 @@ saveLogBtn.addEventListener("click", async () => {
 
     // Save to Supabase
     const supabase = window.supabaseClient?.getClient();
-    if (supabase) {
-      // Insert workout session with user-selected intensity
+    if (supabase && currentUser) {
+      // Get selected date or use current time
+      const selectedDate = workoutDateInput?.value;
+      let createdAt = new Date().toISOString();
+      if (selectedDate) {
+        // Set time to current time but use selected date
+        const now = new Date();
+        const dateObj = new Date(selectedDate);
+        dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        createdAt = dateObj.toISOString();
+      }
+
+      // Insert workout session with user-selected intensity and user_id
       const sessionPayload = {
+        user_id: currentUser.id, // Inject current user's ID
+        created_at: createdAt, // Use selected date
         raw_text: notes || `${Math.floor(duration / 60)} min workout`,
         summary: analysis.summary || notes,
         muscles_hit: analysis.muscles || [],
@@ -200,6 +429,9 @@ saveLogBtn.addEventListener("click", async () => {
     intensityBtns?.forEach((btn) => {
       btn.classList.toggle("selected", btn.dataset.value === "3");
     });
+    
+    // Reset date to today
+    setDefaultDate();
 
     // Navigate to logs
     navigateTo("logs");
@@ -327,6 +559,9 @@ const renderLogs = (logs) => {
       </div>
       <span class="log-item-arrow">›</span>
     `;
+
+    // Make item clickable to edit
+    item.addEventListener("click", () => openEditModal(log));
 
     logList.appendChild(item);
   });
@@ -839,24 +1074,46 @@ const chartToggleBtns = document.querySelectorAll(".chart-toggle-btn");
 const PROFILE_KEY = "workoutTrackerProfile";
 const WEIGHT_HISTORY_KEY = "workoutTrackerWeightHistory";
 
-const loadProfile = () => {
-  // Load from localStorage
-  const saved = localStorage.getItem(PROFILE_KEY);
-  if (saved) {
+const loadProfile = async () => {
+  // Update user email display
+  if (userEmailEl && currentUser) {
+    userEmailEl.textContent = currentUser.email || "User";
+  }
+  
+  const supabase = window.supabaseClient?.getClient();
+  
+  // Try loading from Supabase profiles table
+  if (supabase && currentUser) {
     try {
-      const profile = JSON.parse(saved);
-      weightInput.value = profile.weight || "";
-      heightInput.value = profile.height || "";
-      if (profile.bmi) {
-        showBmi(profile.bmi);
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("height_cm, weight_kg")
+        .eq("id", currentUser.id)
+        .single();
+      
+      if (!error && profile) {
+        if (profile.weight_kg) {
+          weightInput.value = profile.weight_kg;
+        }
+        if (profile.height_cm) {
+          heightInput.value = profile.height_cm;
+        }
+        
+        // Calculate and show BMI if both values exist
+        if (profile.weight_kg && profile.height_cm) {
+          const heightM = profile.height_cm / 100;
+          const bmi = profile.weight_kg / (heightM * heightM);
+          showBmi(bmi);
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to load profile:", e);
     }
   }
 
-  // Load weight history
-  const historyStr = localStorage.getItem(WEIGHT_HISTORY_KEY);
+  // Load weight history from localStorage (per-user)
+  const historyKey = currentUser ? `${WEIGHT_HISTORY_KEY}_${currentUser.id}` : WEIGHT_HISTORY_KEY;
+  const historyStr = localStorage.getItem(historyKey);
   if (historyStr) {
     try {
       weightHistory = JSON.parse(historyStr);
@@ -866,10 +1123,29 @@ const loadProfile = () => {
   }
 };
 
-const saveProfile = (weight, height, bmi) => {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify({ weight, height, bmi }));
+const saveProfile = async (weight, height, bmi) => {
+  const supabase = window.supabaseClient?.getClient();
+  
+  // Save to Supabase profiles table
+  if (supabase && currentUser) {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          weight_kg: weight,
+          height_cm: height,
+        })
+        .eq("id", currentUser.id);
+      
+      if (error) {
+        console.error("Failed to save profile:", error);
+      }
+    } catch (e) {
+      console.error("Failed to save profile:", e);
+    }
+  }
 
-  // Also add to weight history
+  // Also add to weight history (localStorage, per-user)
   const today = new Date().toISOString().split("T")[0];
   const existing = weightHistory.find((e) => e.date === today);
   if (existing) {
@@ -883,7 +1159,9 @@ const saveProfile = (weight, height, bmi) => {
     weightHistory = weightHistory.slice(-30);
   }
 
-  localStorage.setItem(WEIGHT_HISTORY_KEY, JSON.stringify(weightHistory));
+  // Save with user-specific key
+  const historyKey = currentUser ? `${WEIGHT_HISTORY_KEY}_${currentUser.id}` : WEIGHT_HISTORY_KEY;
+  localStorage.setItem(historyKey, JSON.stringify(weightHistory));
 };
 
 const getBmiCategory = (bmi) => {
@@ -1063,7 +1341,211 @@ window.addEventListener("resize", () => {
 });
 
 // ============================================
-// Initialize
+// Edit Workout Modal
 // ============================================
-fetchLogs();
-loadProfile();
+const editModal = document.getElementById("editModal");
+const editForm = document.getElementById("editForm");
+const editWorkoutId = document.getElementById("editWorkoutId");
+const editDate = document.getElementById("editDate");
+const editNotes = document.getElementById("editNotes");
+const closeEditModal = document.getElementById("closeEditModal");
+const deleteWorkoutBtn = document.getElementById("deleteWorkoutBtn");
+const modalBackdrop = editModal?.querySelector(".modal-backdrop");
+
+let currentEditWorkout = null;
+
+const openEditModal = (workout) => {
+  if (!editModal || !workout) return;
+  
+  currentEditWorkout = workout;
+  editWorkoutId.value = workout.id;
+  
+  // Set date
+  const date = new Date(workout.created_at);
+  editDate.value = date.toISOString().split("T")[0];
+  editDate.max = new Date().toISOString().split("T")[0];
+  
+  // Set notes
+  editNotes.value = workout.raw_text || "";
+  
+  editModal.classList.remove("hidden");
+};
+
+const closeEditModalFn = () => {
+  if (editModal) editModal.classList.add("hidden");
+  currentEditWorkout = null;
+};
+
+closeEditModal?.addEventListener("click", closeEditModalFn);
+modalBackdrop?.addEventListener("click", closeEditModalFn);
+
+editForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  if (!currentEditWorkout || !currentUser) return;
+  
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase) return;
+  
+  const newDate = editDate.value;
+  const newNotes = editNotes.value.trim();
+  
+  // Create new timestamp with selected date but preserve time
+  const originalDate = new Date(currentEditWorkout.created_at);
+  const updatedDate = new Date(newDate);
+  updatedDate.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds());
+  
+  try {
+    const { error } = await supabase
+      .from("workouts")
+      .update({
+        created_at: updatedDate.toISOString(),
+        raw_text: newNotes,
+      })
+      .eq("id", currentEditWorkout.id)
+      .eq("user_id", currentUser.id);
+    
+    if (error) throw error;
+    
+    closeEditModalFn();
+    fetchLogs(); // Refresh the list
+  } catch (error) {
+    console.error("Failed to update workout:", error);
+    alert("Failed to update workout. Please try again.");
+  }
+});
+
+deleteWorkoutBtn?.addEventListener("click", async () => {
+  if (!currentEditWorkout || !currentUser) return;
+  
+  if (!confirm("Are you sure you want to delete this workout?")) return;
+  
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase) return;
+  
+  try {
+    const { error } = await supabase
+      .from("workouts")
+      .delete()
+      .eq("id", currentEditWorkout.id)
+      .eq("user_id", currentUser.id);
+    
+    if (error) throw error;
+    
+    closeEditModalFn();
+    fetchLogs(); // Refresh the list
+  } catch (error) {
+    console.error("Failed to delete workout:", error);
+    alert("Failed to delete workout. Please try again.");
+  }
+});
+
+// ============================================
+// "How Am I Doing?" Feedback
+// ============================================
+const howAmIDoingBtn = document.getElementById("howAmIDoingBtn");
+const feedbackBox = document.getElementById("feedbackBox");
+const feedbackText = document.getElementById("feedbackText");
+
+howAmIDoingBtn?.addEventListener("click", async () => {
+  if (!feedbackBox || !feedbackText) return;
+  
+  feedbackBox.classList.remove("hidden");
+  feedbackText.textContent = "Analyzing your workout history...";
+  
+  try {
+    const response = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logs: currentLogs.slice(0, 20) }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      feedbackText.textContent = data.feedback || "Keep up the great work!";
+    } else {
+      // Fallback to local analysis
+      feedbackText.textContent = generateLocalFeedback();
+    }
+  } catch (error) {
+    // Fallback to local analysis
+    feedbackText.textContent = generateLocalFeedback();
+  }
+});
+
+const generateLocalFeedback = () => {
+  if (currentLogs.length === 0) {
+    return "You haven't logged any workouts yet. Start recording to track your progress!";
+  }
+  
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  
+  const thisWeek = currentLogs.filter((log) => new Date(log.created_at) >= weekAgo);
+  const thisMonth = currentLogs.filter((log) => new Date(log.created_at) >= monthAgo);
+  
+  // Analyze muscle balance
+  const muscleCount = {};
+  thisMonth.forEach((log) => {
+    (log.muscles_hit || []).forEach((m) => {
+      muscleCount[m.toLowerCase()] = (muscleCount[m.toLowerCase()] || 0) + 1;
+    });
+  });
+  
+  const cardioCount = thisMonth.filter((log) => log.cardio_detected).length;
+  const flexCount = thisMonth.filter((log) => log.flexibility_detected).length;
+  
+  let feedback = [];
+  
+  // Consistency feedback
+  if (thisWeek.length >= 5) {
+    feedback.push("🔥 Amazing consistency this week! You're on fire with " + thisWeek.length + " workouts!");
+  } else if (thisWeek.length >= 3) {
+    feedback.push("💪 Good job! " + thisWeek.length + " workouts this week keeps you on track.");
+  } else if (thisWeek.length >= 1) {
+    feedback.push("👍 You got " + thisWeek.length + " workout(s) in this week. Try to aim for 3-4!");
+  } else {
+    feedback.push("😴 No workouts logged this week. Time to get moving!");
+  }
+  
+  // Monthly progress
+  feedback.push("\n📅 This month: " + thisMonth.length + " total workouts.");
+  
+  // Balance feedback
+  if (cardioCount === 0 && thisMonth.length >= 3) {
+    feedback.push("\n❤️ Consider adding some cardio to your routine for heart health!");
+  }
+  if (flexCount === 0 && thisMonth.length >= 5) {
+    feedback.push("\n🧘 Don't forget stretching and mobility work for recovery!");
+  }
+  
+  // Muscle balance
+  const muscleEntries = Object.entries(muscleCount).sort((a, b) => b[1] - a[1]);
+  if (muscleEntries.length > 0) {
+    const top = muscleEntries.slice(0, 3).map(([m]) => m).join(", ");
+    feedback.push("\n🎯 Most trained: " + top);
+    
+    const neglected = ["chest", "back", "legs", "shoulders", "core"].filter(
+      (m) => !muscleCount[m] || muscleCount[m] < 2
+    );
+    if (neglected.length > 0) {
+      feedback.push("⚠️ Consider training more: " + neglected.join(", "));
+    }
+  }
+  
+  return feedback.join("\n");
+};
+
+// ============================================
+// Initialize App (called after auth)
+// ============================================
+const initApp = () => {
+  fetchLogs();
+  loadProfile();
+};
+
+// ============================================
+// Bootstrap - Start with Auth
+// ============================================
+initAuth();

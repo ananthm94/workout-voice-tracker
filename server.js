@@ -222,6 +222,75 @@ app.get("/api/models", async (req, res) => {
 });
 
 // ============================================
+// "How Am I Doing?" Feedback
+// ============================================
+app.post("/api/feedback", async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
+    }
+
+    const { logs } = req.body || {};
+    
+    if (!logs || logs.length === 0) {
+      return res.json({ feedback: "Start logging workouts to get personalized feedback!" });
+    }
+
+    const workoutSummary = logs.slice(0, 20).map((log) => ({
+      date: log.created_at,
+      muscles: log.muscles_hit || [],
+      cardio: log.cardio_detected || false,
+      flexibility: log.flexibility_detected || false,
+      intensity: log.intensity_score || log.exertion_score || 3,
+    }));
+
+    const systemPrompt = `You are a supportive fitness coach. Analyze the user's workout history and provide encouraging, actionable feedback.
+
+Workout history (most recent first):
+${JSON.stringify(workoutSummary, null, 2)}
+
+Provide feedback covering:
+1. Consistency and frequency (praise what's going well)
+2. Muscle balance (are they neglecting any areas?)
+3. Recovery (are they overtraining any muscles?)
+4. Cardio and flexibility balance
+5. One specific tip for improvement
+
+Keep it friendly, motivating, and around 150 words. Use emojis sparingly for warmth. Be specific about what they're doing well and what to improve.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
+          generationConfig: { temperature: 0.8 },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(500).json({ error: err || "Gemini request failed." });
+    }
+
+    const json = await response.json();
+    const content =
+      json.candidates?.[0]?.content?.parts?.map((part) => part.text).join("") ||
+      "";
+    
+    return res.json({ feedback: content.trim() });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error." });
+  }
+});
+
+// ============================================
 // Health Check
 // ============================================
 app.get("/api/health", (req, res) => {
