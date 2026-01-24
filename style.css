@@ -529,8 +529,9 @@ body {
   justify-content: center;
   gap: 16px;
   padding: 20px;
-  background: var(--bg);
+  background: var(--bg-secondary);
   border-radius: var(--radius-lg);
+  min-height: 320px;
 }
 
 .heatmap-view {
@@ -538,17 +539,21 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  min-width: 150px;
+  min-height: 300px;
 }
 
 .body-svg {
   width: 140px;
   height: 280px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .body-part {
-  fill: #e8e8e8;
-  stroke: #d0d0d0;
-  stroke-width: 0.5;
+  fill: #dcdcdc;
+  stroke: #b0b0b0;
+  stroke-width: 1;
   transition: fill 0.4s ease, filter 0.4s ease;
 }
 
@@ -1239,6 +1244,12 @@ body {
 .delete-btn:hover {
   background: var(--accent);
   color: #fff;
+}
+
+/* Re-analyze button */
+.reanalyze-btn {
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 /* Make log items look more clickable */

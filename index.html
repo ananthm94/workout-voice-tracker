@@ -118,12 +118,15 @@
         </header>
 
         <div class="logs-content">
+          <button id="reanalyzeBtn" class="secondary-btn reanalyze-btn">
+            🔄 Re-analyze Old Entries
+          </button>
           <ul id="logList" class="log-list"></ul>
 
           <div class="heatmap-section">
             <div class="heatmap-container">
               <div class="heatmap-view">
-                <svg id="bodyFront" viewBox="0 0 200 400" class="body-svg">
+                <svg id="bodyFront" viewBox="0 0 200 400" class="body-svg" xmlns="http://www.w3.org/2000/svg">
                   <!-- Head -->
                   <ellipse cx="100" cy="30" rx="25" ry="28" class="body-part" id="head-front"/>
                   <!-- Neck -->
@@ -159,7 +162,7 @@
                 <span class="heatmap-label">Front view</span>
               </div>
               <div class="heatmap-view">
-                <svg id="bodyBack" viewBox="0 0 200 400" class="body-svg">
+                <svg id="bodyBack" viewBox="0 0 200 400" class="body-svg" xmlns="http://www.w3.org/2000/svg">
                   <!-- Head -->
                   <ellipse cx="100" cy="30" rx="25" ry="28" class="body-part" id="head-back"/>
                   <!-- Neck -->

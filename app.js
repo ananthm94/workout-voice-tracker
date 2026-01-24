@@ -493,6 +493,19 @@ const logList = document.getElementById("logList");
 const insightText = document.getElementById("insightText");
 const strengthCount = document.getElementById("strengthCount");
 const cardioCount = document.getElementById("cardioCount");
+const reanalyzeBtn = document.getElementById("reanalyzeBtn");
+
+// Wire up re-analyze button
+reanalyzeBtn?.addEventListener("click", async () => {
+  reanalyzeBtn.disabled = true;
+  reanalyzeBtn.textContent = "Analyzing...";
+  try {
+    await reanalyzeOldEntries();
+  } finally {
+    reanalyzeBtn.disabled = false;
+    reanalyzeBtn.textContent = "🔄 Re-analyze Old Entries";
+  }
+});
 const flexibilityCount = document.getElementById("flexibilityCount");
 
 const fetchLogs = async () => {
@@ -526,6 +539,89 @@ const fetchLogs = async () => {
     console.error(error);
     renderLogs([]);
   }
+};
+
+// Re-analyze old entries that have empty muscles_hit
+const reanalyzeOldEntries = async () => {
+  const supabase = window.supabaseClient?.getClient();
+  if (!supabase || !currentUser) {
+    alert("Not logged in");
+    return;
+  }
+
+  // Fetch ALL entries that need re-analysis (not just currentLogs)
+  const { data: allEntries, error: fetchError } = await supabase
+    .from("workouts")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  if (fetchError) {
+    alert("Failed to fetch entries: " + fetchError.message);
+    return;
+  }
+
+  // Find entries with empty muscles_hit
+  const entriesToUpdate = (allEntries || []).filter(
+    (log) => !log.muscles_hit || log.muscles_hit.length === 0
+  );
+
+  if (entriesToUpdate.length === 0) {
+    alert("All entries are already analyzed!");
+    return;
+  }
+
+  const confirmMsg = `Found ${entriesToUpdate.length} entries without AI analysis. Re-analyze them now?`;
+  if (!confirm(confirmMsg)) return;
+
+  let updated = 0;
+  let failed = 0;
+
+  for (const entry of entriesToUpdate) {
+    try {
+      // Call the reanalyze endpoint
+      const response = await fetch("/api/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: entry.raw_text || "General workout" }),
+      });
+
+      if (!response.ok) {
+        failed++;
+        continue;
+      }
+
+      const analysis = await response.json();
+
+      // Update the entry in Supabase
+      const { error } = await supabase
+        .from("workouts")
+        .update({
+          muscles_hit: analysis.muscles || [],
+          exertion_score: analysis.exertion_score || 5,
+          cardio_detected: analysis.cardio_detected || false,
+          flexibility_detected: analysis.flexibility_detected || false,
+          summary: analysis.summary || entry.raw_text,
+        })
+        .eq("id", entry.id)
+        .eq("user_id", currentUser.id);
+
+      if (error) {
+        failed++;
+      } else {
+        updated++;
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      console.error("Failed to reanalyze entry:", entry.id, err);
+      failed++;
+    }
+  }
+
+  alert(`Done! Updated: ${updated}, Failed: ${failed}`);
+  fetchLogs(); // Refresh the list
 };
 
 const renderLogs = (logs) => {
