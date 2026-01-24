@@ -9,6 +9,15 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+// Disable caching for development
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 app.use(express.static(path.join(__dirname)));
 
 // In-memory cache (in production, use Redis or database)
@@ -284,6 +293,75 @@ Keep it friendly, motivating, and around 120 words. Use emojis sparingly for war
       "";
     
     return res.json({ feedback: content.trim() });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error." });
+  }
+});
+
+// ============================================
+// Re-analyze Workout
+// ============================================
+app.post("/api/reanalyze", async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
+    }
+    const { text } = req.body || {};
+    if (!text) {
+      return res.status(400).json({ error: "Missing text." });
+    }
+
+    const systemPrompt = `You are a fitness data extractor. Analyze the user's workout notes and extract structured data.
+
+Extract the following JSON:
+{
+  "muscles": ["list of specific muscle groups worked, e.g., chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core"],
+  "exertion_score": 1-10 (intensity level),
+  "cardio_detected": boolean (true if cardio/running/cycling/HIIT mentioned),
+  "flexibility_detected": boolean (true if stretching/yoga/mobility mentioned),
+  "summary": "brief 1-sentence summary"
+}
+
+Return ONLY raw JSON, no markdown.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: systemPrompt },
+                { text: `Workout notes: "${text}"` },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0.2 },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(500).json({ error: err || "Gemini request failed." });
+    }
+
+    const json = await response.json();
+    const content =
+      json.candidates?.[0]?.content?.parts?.map((part) => part.text).join("") ||
+      "";
+
+    // Parse JSON from response
+    const cleanedContent = content.replace(/```json\n?|\n?```/g, "").trim();
+    const parsed = JSON.parse(cleanedContent);
+    return res.json(parsed);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Server error." });
