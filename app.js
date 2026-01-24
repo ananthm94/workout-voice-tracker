@@ -381,14 +381,22 @@ saveLogBtn.addEventListener("click", async () => {
     // Save to Supabase
     const supabase = window.supabaseClient?.getClient();
     if (supabase && currentUser) {
-      // Get selected date or use current time
+      // Get selected date or use current time (all dates in UTC)
       const selectedDate = workoutDateInput?.value;
-      let createdAt = new Date().toISOString();
+      let createdAt = new Date().toISOString(); // Already UTC
       if (selectedDate) {
-        // Set time to current time but use selected date
+        // Parse selected date and set current UTC time
         const now = new Date();
-        const dateObj = new Date(selectedDate);
-        dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        const [year, month, day] = selectedDate.split("-").map(Number);
+        // Create date in UTC with current UTC time
+        const dateObj = new Date(Date.UTC(
+          year, 
+          month - 1, 
+          day, 
+          now.getUTCHours(), 
+          now.getUTCMinutes(), 
+          now.getUTCSeconds()
+        ));
         createdAt = dateObj.toISOString();
       }
 
@@ -540,13 +548,24 @@ const renderLogs = (logs) => {
     const muscles = Array.isArray(log.muscles_hit) ? log.muscles_hit : [];
     const muscleStr = muscles.length > 0 ? muscles.slice(0, 3).join(" & ") : "Workout";
 
-    // Build tags
+    // Build tags - Strength (🏋️), Cardio (❤️), Flexibility (🧘)
     let tagsHtml = "";
+    // Show strength icon if muscles were worked (and not only cardio/flexibility)
+    if (muscles.length > 0 && !log.cardio_detected && !log.flexibility_detected) {
+      tagsHtml += '<span class="log-tag" title="Strength">🏋️</span>';
+    } else if (muscles.length > 0) {
+      // Mixed workout - show strength alongside others
+      tagsHtml += '<span class="log-tag" title="Strength">🏋️</span>';
+    }
     if (log.cardio_detected) {
       tagsHtml += '<span class="log-tag" title="Cardio">❤️</span>';
     }
     if (log.flexibility_detected) {
       tagsHtml += '<span class="log-tag" title="Flexibility">🧘</span>';
+    }
+    // If no specific type detected but has notes, show generic workout
+    if (!tagsHtml && log.raw_text) {
+      tagsHtml += '<span class="log-tag" title="Workout">💪</span>';
     }
 
     item.innerHTML = `
@@ -821,6 +840,13 @@ restSlider?.addEventListener("input", (e) => {
   updateRecommendationFromState();
 });
 
+// Helper: Get logs from current and last week only
+const getRecentTwoWeeksLogs = () => {
+  const now = new Date();
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  return currentLogs.filter((log) => new Date(log.created_at) >= twoWeeksAgo);
+};
+
 // Smart Recommendation Engine
 const getRecommendedWorkout = (energy, rest, history) => {
   // Rule-based recommendation logic
@@ -885,10 +911,11 @@ const getRecommendedWorkout = (energy, rest, history) => {
 };
 
 const updateRecommendationFromState = () => {
+  const recentLogs = getRecentTwoWeeksLogs();
   const recommended = getRecommendedWorkout(
     userState.energyLevel,
     userState.restLevel,
-    currentLogs
+    recentLogs
   );
 
   if (!recommended) return;
@@ -930,7 +957,7 @@ const loadRecommendation = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-        logs: currentLogs.slice(0, 7),
+        logs: getRecentTwoWeeksLogs(),
         energy: userState.energyLevel,
         rest: userState.restLevel,
       }),
@@ -1244,18 +1271,35 @@ const renderChart = () => {
   const chartHeight = height - padding.top - padding.bottom;
 
   const values = chartData.map((d) => d.value);
-  const minVal = Math.min(...values) * 0.95;
-  const maxVal = Math.max(...values) * 1.05;
+  
+  // For sessions chart, use 0 as min and round up max to next whole number
+  // For weight chart, use a narrow range around the data
+  const isSessionsChart = currentChartType === "sessions";
+  let minVal, maxVal;
+  
+  if (isSessionsChart) {
+    minVal = 0;
+    maxVal = Math.max(Math.ceil(Math.max(...values) * 1.2), 5); // At least 5 for readability
+  } else {
+    minVal = Math.min(...values) * 0.95;
+    maxVal = Math.max(...values) * 1.05;
+  }
   const range = maxVal - minVal || 1;
 
   // Y-axis labels
   ctx.fillStyle = "#86868b";
   ctx.font = "11px -apple-system, sans-serif";
   ctx.textAlign = "right";
-  for (let i = 0; i <= 4; i++) {
-    const val = minVal + (i / 4) * range;
-    const y = padding.top + chartHeight - (i / 4) * chartHeight;
-    ctx.fillText(val.toFixed(1), padding.left - 8, y + 4);
+  
+  // Determine step for whole numbers (for sessions) or decimals (for weight)
+  const numLabels = isSessionsChart ? Math.min(maxVal, 5) : 4;
+  for (let i = 0; i <= numLabels; i++) {
+    const val = minVal + (i / numLabels) * range;
+    const y = padding.top + chartHeight - (i / numLabels) * chartHeight;
+    
+    // Format: whole numbers for sessions, 1 decimal for weight
+    const labelText = isSessionsChart ? Math.round(val).toString() : val.toFixed(1);
+    ctx.fillText(labelText, padding.left - 8, y + 4);
   }
 
   // Draw line
@@ -1457,7 +1501,7 @@ howAmIDoingBtn?.addEventListener("click", async () => {
     const response = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ logs: currentLogs.slice(0, 20) }),
+      body: JSON.stringify({ logs: getRecentTwoWeeksLogs() }),
     });
     
     if (response.ok) {
@@ -1474,31 +1518,35 @@ howAmIDoingBtn?.addEventListener("click", async () => {
 });
 
 const generateLocalFeedback = () => {
-  if (currentLogs.length === 0) {
-    return "You haven't logged any workouts yet. Start recording to track your progress!";
+  const recentLogs = getRecentTwoWeeksLogs();
+  
+  if (recentLogs.length === 0) {
+    return "You haven't logged any workouts in the past 2 weeks. Time to get moving!";
   }
   
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
-  const thisWeek = currentLogs.filter((log) => new Date(log.created_at) >= weekAgo);
-  const thisMonth = currentLogs.filter((log) => new Date(log.created_at) >= monthAgo);
+  const thisWeek = recentLogs.filter((log) => new Date(log.created_at) >= weekAgo);
+  const lastWeek = recentLogs.filter((log) => {
+    const logDate = new Date(log.created_at);
+    return logDate < weekAgo;
+  });
   
-  // Analyze muscle balance
+  // Analyze muscle balance (using last 2 weeks)
   const muscleCount = {};
-  thisMonth.forEach((log) => {
+  recentLogs.forEach((log) => {
     (log.muscles_hit || []).forEach((m) => {
       muscleCount[m.toLowerCase()] = (muscleCount[m.toLowerCase()] || 0) + 1;
     });
   });
   
-  const cardioCount = thisMonth.filter((log) => log.cardio_detected).length;
-  const flexCount = thisMonth.filter((log) => log.flexibility_detected).length;
+  const cardioCount = recentLogs.filter((log) => log.cardio_detected).length;
+  const flexCount = recentLogs.filter((log) => log.flexibility_detected).length;
   
   let feedback = [];
   
-  // Consistency feedback
+  // Weekly comparison
   if (thisWeek.length >= 5) {
     feedback.push("🔥 Amazing consistency this week! You're on fire with " + thisWeek.length + " workouts!");
   } else if (thisWeek.length >= 3) {
@@ -1509,14 +1557,25 @@ const generateLocalFeedback = () => {
     feedback.push("😴 No workouts logged this week. Time to get moving!");
   }
   
-  // Monthly progress
-  feedback.push("\n📅 This month: " + thisMonth.length + " total workouts.");
+  // Last week comparison
+  if (lastWeek.length > 0) {
+    if (thisWeek.length > lastWeek.length) {
+      feedback.push("\n📈 Up from " + lastWeek.length + " last week - great improvement!");
+    } else if (thisWeek.length < lastWeek.length) {
+      feedback.push("\n📉 Down from " + lastWeek.length + " last week - let's pick it up!");
+    } else {
+      feedback.push("\n📊 Same as last week (" + lastWeek.length + ") - staying consistent!");
+    }
+  }
+  
+  // 2-week total
+  feedback.push("\n📅 Last 2 weeks: " + recentLogs.length + " total workouts.");
   
   // Balance feedback
-  if (cardioCount === 0 && thisMonth.length >= 3) {
+  if (cardioCount === 0 && recentLogs.length >= 3) {
     feedback.push("\n❤️ Consider adding some cardio to your routine for heart health!");
   }
-  if (flexCount === 0 && thisMonth.length >= 5) {
+  if (flexCount === 0 && recentLogs.length >= 5) {
     feedback.push("\n🧘 Don't forget stretching and mobility work for recovery!");
   }
   

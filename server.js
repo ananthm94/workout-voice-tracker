@@ -244,19 +244,19 @@ app.post("/api/feedback", async (req, res) => {
       intensity: log.intensity_score || log.exertion_score || 3,
     }));
 
-    const systemPrompt = `You are a supportive fitness coach. Analyze the user's workout history and provide encouraging, actionable feedback.
+    const systemPrompt = `You are a supportive fitness coach. Analyze the user's LAST 2 WEEKS of workout history and provide encouraging, actionable feedback.
 
-Workout history (most recent first):
+Workout history from the past 2 weeks (most recent first):
 ${JSON.stringify(workoutSummary, null, 2)}
 
-Provide feedback covering:
-1. Consistency and frequency (praise what's going well)
-2. Muscle balance (are they neglecting any areas?)
-3. Recovery (are they overtraining any muscles?)
-4. Cardio and flexibility balance
-5. One specific tip for improvement
+Focus your analysis on THIS WEEK vs LAST WEEK comparison. Provide feedback covering:
+1. Week-over-week progress (compare this week to last week)
+2. Consistency this week (how many workouts?)
+3. Muscle balance (any areas neglected this week?)
+4. Recovery considerations
+5. One specific actionable tip for the coming days
 
-Keep it friendly, motivating, and around 150 words. Use emojis sparingly for warmth. Be specific about what they're doing well and what to improve.`;
+Keep it friendly, motivating, and around 120 words. Use emojis sparingly for warmth. Be specific about what they're doing well this week.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
