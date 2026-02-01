@@ -118,6 +118,36 @@
         </header>
 
         <div class="logs-content">
+          <!-- Week Navigation -->
+          <div class="week-nav">
+            <button id="prevWeekBtn" class="week-nav-btn">‹</button>
+            <div class="week-info">
+              <span id="weekLabel">This Week</span>
+              <span id="weekDates" class="week-dates">Jan 27 - Feb 2</span>
+            </div>
+            <button id="nextWeekBtn" class="week-nav-btn">›</button>
+          </div>
+
+          <!-- Week Summary -->
+          <div class="week-summary">
+            <div class="summary-stat">
+              <span class="stat-value" id="weekWorkouts">0</span>
+              <span class="stat-label">Workouts</span>
+            </div>
+            <div class="summary-stat">
+              <span class="stat-value" id="weekStrength">0</span>
+              <span class="stat-label">🏋️ Strength</span>
+            </div>
+            <div class="summary-stat">
+              <span class="stat-value" id="weekCardio">0</span>
+              <span class="stat-label">❤️ Cardio</span>
+            </div>
+            <div class="summary-stat">
+              <span class="stat-value" id="weekFlex">0</span>
+              <span class="stat-label">🧘 Flex</span>
+            </div>
+          </div>
+
           <button id="reanalyzeBtn" class="secondary-btn reanalyze-btn">
             🔄 Re-analyze Old Entries
           </button>

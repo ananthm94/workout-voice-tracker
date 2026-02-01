@@ -495,6 +495,121 @@ const strengthCount = document.getElementById("strengthCount");
 const cardioCount = document.getElementById("cardioCount");
 const reanalyzeBtn = document.getElementById("reanalyzeBtn");
 
+// Week navigation elements
+const prevWeekBtn = document.getElementById("prevWeekBtn");
+const nextWeekBtn = document.getElementById("nextWeekBtn");
+const weekLabel = document.getElementById("weekLabel");
+const weekDates = document.getElementById("weekDates");
+const weekWorkouts = document.getElementById("weekWorkouts");
+const weekStrength = document.getElementById("weekStrength");
+const weekCardio = document.getElementById("weekCardio");
+const weekFlex = document.getElementById("weekFlex");
+
+// Week navigation state
+let currentWeekOffset = 0; // 0 = this week, -1 = last week, etc.
+let allLogs = []; // Store all logs for filtering
+
+// Get Monday of a week
+const getMonday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  return new Date(d.setDate(diff));
+};
+
+// Get week range based on offset
+const getWeekRange = (offset = 0) => {
+  const now = new Date();
+  const monday = getMonday(now);
+  monday.setDate(monday.getDate() + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  
+  return { start: monday, end: sunday };
+};
+
+// Format date range for display
+const formatWeekRange = (start, end) => {
+  const options = { month: "short", day: "numeric" };
+  const startStr = start.toLocaleDateString("en-US", options);
+  const endStr = end.toLocaleDateString("en-US", options);
+  return `${startStr} - ${endStr}`;
+};
+
+// Get week label
+const getWeekLabel = (offset) => {
+  if (offset === 0) return "This Week";
+  if (offset === -1) return "Last Week";
+  if (offset === -2) return "2 Weeks Ago";
+  const { start } = getWeekRange(offset);
+  return start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+// Filter logs by week
+const filterLogsByWeek = (logs, offset) => {
+  const { start, end } = getWeekRange(offset);
+  return logs.filter((log) => {
+    const logDate = new Date(log.created_at);
+    return logDate >= start && logDate <= end;
+  });
+};
+
+// Update week display
+const updateWeekDisplay = () => {
+  const { start, end } = getWeekRange(currentWeekOffset);
+  
+  if (weekLabel) weekLabel.textContent = getWeekLabel(currentWeekOffset);
+  if (weekDates) weekDates.textContent = formatWeekRange(start, end);
+  
+  // Disable next button if on current week
+  if (nextWeekBtn) nextWeekBtn.disabled = currentWeekOffset >= 0;
+  
+  // Filter and render logs for this week
+  const weekLogs = filterLogsByWeek(allLogs, currentWeekOffset);
+  
+  // #region agent log
+  console.log('[DEBUG] updateWeekDisplay: offset=', currentWeekOffset, 'range=', start.toISOString(), 'to', end.toISOString());
+  console.log('[DEBUG] updateWeekDisplay: allLogs=', allLogs.length, 'weekLogs=', weekLogs.length);
+  fetch('http://127.0.0.1:7242/ingest/4c41a83b-7bfa-4fc3-a4a9-82bc14816237',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:updateWeekDisplay',message:'week filter',data:{offset:currentWeekOffset,start:start.toISOString(),end:end.toISOString(),allLogs:allLogs.length,weekLogs:weekLogs.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  
+  renderLogs(weekLogs);
+  
+  // Update week summary
+  updateWeekSummary(weekLogs);
+};
+
+// Update week summary stats
+const updateWeekSummary = (logs) => {
+  const total = logs.length;
+  const strength = logs.filter((l) => l.muscles_hit && l.muscles_hit.length > 0 && !l.cardio_detected && !l.flexibility_detected).length;
+  const cardio = logs.filter((l) => l.cardio_detected).length;
+  const flex = logs.filter((l) => l.flexibility_detected).length;
+  // Count mixed workouts as strength
+  const mixed = logs.filter((l) => l.muscles_hit && l.muscles_hit.length > 0 && (l.cardio_detected || l.flexibility_detected)).length;
+  
+  if (weekWorkouts) weekWorkouts.textContent = total;
+  if (weekStrength) weekStrength.textContent = strength + mixed;
+  if (weekCardio) weekCardio.textContent = cardio;
+  if (weekFlex) weekFlex.textContent = flex;
+};
+
+// Week navigation handlers
+prevWeekBtn?.addEventListener("click", () => {
+  currentWeekOffset--;
+  updateWeekDisplay();
+});
+
+nextWeekBtn?.addEventListener("click", () => {
+  if (currentWeekOffset < 0) {
+    currentWeekOffset++;
+    updateWeekDisplay();
+  }
+});
+
 // Wire up re-analyze button
 reanalyzeBtn?.addEventListener("click", async () => {
   reanalyzeBtn.disabled = true;
@@ -510,23 +625,51 @@ const flexibilityCount = document.getElementById("flexibilityCount");
 
 const fetchLogs = async () => {
   const supabase = window.supabaseClient?.getClient();
-  if (!supabase) {
+  if (!supabase || !currentUser) {
+    console.log('[DEBUG] fetchLogs: No supabase or currentUser', { supabase: !!supabase, currentUser: !!currentUser });
+    allLogs = [];
+    currentLogs = [];
     renderLogs([]);
     return;
   }
 
+  console.log('[DEBUG] fetchLogs: Current user ID:', currentUser.id, 'Email:', currentUser.email);
+
   try {
-    // Fetch recent sessions
+    // First, try fetching ALL workouts (without user filter) to see what exists
+    const { data: allData, error: allError } = await supabase
+      .from("workouts")
+      .select("id, user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    
+    console.log('[DEBUG] All workouts (first 10):', allData?.map(w => ({ id: w.id, user_id: w.user_id })));
+    if (allError) console.log('[DEBUG] All workouts error:', allError);
+
+    // Fetch ALL sessions for this user (no limit)
+    // Explicitly filter by user_id for RLS compatibility
     const { data, error } = await supabase
       .from("workouts")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[DEBUG] Supabase error:', error);
+      throw error;
+    }
 
-    currentLogs = data || [];
-    renderLogs(currentLogs);
+    allLogs = data || []; // Store all logs
+    currentLogs = allLogs; // Keep currentLogs for other features
+    
+    // #region agent log
+    console.log('[DEBUG] fetchLogs: Total fetched:', allLogs.length);
+    console.log('[DEBUG] fetchLogs: Date range:', allLogs.length > 0 ? `${allLogs[allLogs.length-1]?.created_at} to ${allLogs[0]?.created_at}` : 'empty');
+    fetch('http://127.0.0.1:7242/ingest/4c41a83b-7bfa-4fc3-a4a9-82bc14816237',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:fetchLogs',message:'fetched logs',data:{total:allLogs.length,oldest:allLogs[allLogs.length-1]?.created_at,newest:allLogs[0]?.created_at},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    
+    // Update week display (this will filter and render)
+    updateWeekDisplay();
     
     // Load or compute heatmap cache
     await loadHeatmapCache();
